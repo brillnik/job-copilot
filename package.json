@@ -1,0 +1,23 @@
+{
+  "name": "job-copilot",
+  "private": true,
+  "workspaces": ["apps/web"],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"bun run dev:api\" \"bun run dev:web\"",
+    "dev:web": "bun run --cwd apps/web dev",
+    "db:up": "docker compose up -d --wait postgres minio minio-init",
+    "db:migrate": "cd apps/api && uv run alembic upgrade head",
+    "db:down": "docker compose down",
+    "dev:api": "cd apps/api && uv run uvicorn app.main:app --reload --port 8000",
+    "gen:api": "cd apps/api && uv run python -c \"import json;from app.main import app;print(json.dumps(app.openapi(),indent=2))\" > ../web/src/lib/api/openapi.json && bun run --cwd ../web openapi-typescript src/lib/api/openapi.json -o src/lib/api/schema.d.ts",
+    "build": "bun run --cwd apps/web build",
+    "lint": "bun run --cwd apps/web lint && cd apps/api && uv run ruff check .",
+    "test": "cd apps/api && uv run pytest"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  },
+  "trustedDependencies": [
+    "unrs-resolver"
+  ]
+}
