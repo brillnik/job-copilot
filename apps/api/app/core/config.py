@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     upload_dir: Path = ROOT / "apps" / "api" / "uploads"
     max_resume_bytes: int = 5 * 1024 * 1024
 
+    # Claude vision extracts a draft profile from an uploaded resume.
+    anthropic_api_key: str = ""
+    extraction_model: str = "claude-sonnet-5-5"
+
     # Auth0 (AUTH0_DOMAIN / AUTH0_AUDIENCE): domain without https://
     auth0_domain: str = ""
     auth0_audience: str = ""

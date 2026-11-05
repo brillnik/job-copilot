@@ -3,11 +3,14 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.ai.embeddings import Embedder, HashingEmbedder
+from app.ai.extractor import ClaudeVisionExtractor, ProfileExtractor
 from app.core.config import settings
 from app.core.security import Claims
 from app.db.session import get_db
 from app.models.user import User
 from app.repositories.manager import RepositoryManager
+from app.services.profile import ProfileService
 from app.services.resume import ResumeService
 from app.services.user import UserService
 from app.storage.base import Storage
@@ -43,6 +46,26 @@ def get_resume_service(
 
 
 ResumeServiceDep = Annotated[ResumeService, Depends(get_resume_service)]
+
+
+def get_extractor() -> ProfileExtractor:
+    return ClaudeVisionExtractor(settings.anthropic_api_key, settings.extraction_model)
+
+
+def get_embedder() -> Embedder:
+    return HashingEmbedder()
+
+
+def get_profile_service(
+    repos: Repos,
+    resumes: ResumeServiceDep,
+    extractor: Annotated[ProfileExtractor, Depends(get_extractor)],
+    embedder: Annotated[Embedder, Depends(get_embedder)],
+) -> ProfileService:
+    return ProfileService(repos, resumes, extractor, embedder)
+
+
+ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
 
 
 def get_current_user(claims: Claims, repos: Repos) -> User:

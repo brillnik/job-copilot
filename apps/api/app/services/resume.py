@@ -23,6 +23,12 @@ class ResumeService:
         self.max_bytes = max_bytes
 
     def upload(self, user_id: uuid.UUID, filename: str, stream: BinaryIO) -> Resume:
+        return self.ingest(user_id, filename, stream)[0]
+
+    def ingest(
+        self, user_id: uuid.UUID, filename: str, stream: BinaryIO
+    ) -> tuple[Resume, bytes]:
+        """Validate and store an upload, returning the row and the validated bytes."""
         ext = PurePath(filename).suffix.lower()
         if ext not in FORMATS:
             raise UnsupportedFileType("Only PDF and DOCX are supported")
@@ -39,7 +45,7 @@ class ResumeService:
         key = f"{user_id.hex}/{resume_id}{ext}"
         self.storage.save(key, data)
         try:
-            return self.repos.resumes.add(
+            resume = self.repos.resumes.add(
                 Resume(
                     id=resume_id,
                     user_id=user_id,
@@ -48,6 +54,7 @@ class ResumeService:
                     storage_key=key,
                 )
             )
+            return resume, data
         except Exception:
             self.storage.delete(key)
             raise

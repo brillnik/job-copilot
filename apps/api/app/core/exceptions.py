@@ -27,6 +27,21 @@ class EmptyFile(AppError):
     detail = "File is empty"
 
 
+class NotFound(AppError):
+    status_code = status.HTTP_404_NOT_FOUND
+    detail = "Not found"
+
+
+class ExtractionFailed(AppError):
+    status_code = status.HTTP_502_BAD_GATEWAY
+    detail = "Could not extract a profile from the resume"
+
+
+class ExtractionUnavailable(AppError):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    detail = "Resume extraction is not configured"
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _handle(_: Request, exc: AppError) -> JSONResponse:
