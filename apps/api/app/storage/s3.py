@@ -24,5 +24,9 @@ class S3Storage:
     def save(self, key: str, data: bytes) -> None:
         self.client.put_object(Bucket=self.bucket, Key=key, Body=data)
 
+    def read(self, key: str) -> bytes:
+        obj = self.client.get_object(Bucket=self.bucket, Key=key)
+        return obj["Body"].read()
+
     def delete(self, key: str) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=key)

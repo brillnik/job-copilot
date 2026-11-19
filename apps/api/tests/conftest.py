@@ -8,6 +8,8 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.tasks.queue import RecordingQueue
+from app.tasks.runtime import get_queue
 
 
 @pytest.fixture
@@ -22,10 +24,17 @@ def db_session():
         yield session
 
 
+@pytest.fixture
+def queue():
+    return RecordingQueue()
+
+
 @pytest.fixture(autouse=True)
-def overrides(db_session, tmp_path, monkeypatch):
+def overrides(db_session, tmp_path, monkeypatch, queue):
     monkeypatch.setattr(settings, "storage_backend", "local")
     monkeypatch.setattr(settings, "upload_dir", tmp_path)
+    monkeypatch.setattr(settings, "embedding_backend", "hashing")
     app.dependency_overrides[get_db] = lambda: db_session
+    app.dependency_overrides[get_queue] = lambda: queue
     yield
     app.dependency_overrides.clear()

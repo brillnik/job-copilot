@@ -1,4 +1,6 @@
+import logging
 import math
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import BinaryIO
@@ -14,7 +16,11 @@ from app.schemas.profile import (
     ProfileData,
     RankedBullet,
 )
+from app.services.profile_index import current_index
 from app.services.resume import ResumeService
+from app.tasks.queue import TaskQueue
+
+log = logging.getLogger(__name__)
 
 
 def _dump(data: ProfileData) -> dict:
@@ -37,27 +43,49 @@ class ProfileService:
         resumes: ResumeService,
         extractor: ProfileExtractor,
         embedder: Embedder,
+        queue: TaskQueue | None = None,
     ) -> None:
         self.repos = repos
         self.resumes = resumes
         self.extractor = extractor
         self.embedder = embedder
+        self.queue = queue
 
     def upload(self, user_id: uuid.UUID, filename: str, stream: BinaryIO) -> Profile:
         """Store the resume, extract it with Claude, and (re)create the draft."""
         resume, data = self.resumes.ingest(user_id, filename, stream)
-        extracted = self.extractor.extract(filename, data)
+        started = time.perf_counter()
+        try:
+            extracted = self.extractor.extract(filename, data)
+        except Exception as e:
+            # Type only: the message can echo resume content.
+            log.error(
+                "profile extraction failed user=%s resume=%s error=%s after %.1fs",
+                user_id,
+                resume.id,
+                type(e).__name__,
+                time.perf_counter() - started,
+            )
+            raise
+        log.info(
+            "profile extracted user=%s resume=%s in %.1fs",
+            user_id,
+            resume.id,
+            time.perf_counter() - started,
+        )
         return self._save_draft(user_id, extracted, resume.id)
 
     def get_approved(self, user_id: uuid.UUID) -> Profile:
         profile = self.repos.profiles.get_latest_approved(user_id)
         if profile is None:
+            log.debug("no approved profile user=%s", user_id)
             raise NotFound("No approved profile yet")
         return profile
 
     def get_draft(self, user_id: uuid.UUID) -> Profile:
         draft = self.repos.profiles.get_draft(user_id)
         if draft is None:
+            log.debug("no draft profile user=%s", user_id)
             raise NotFound("No draft profile")
         return draft
 
@@ -69,7 +97,7 @@ class ProfileService:
     ) -> Profile:
         draft = self.repos.profiles.get_draft(user_id)
         if draft is None:
-            return self.repos.profiles.add(
+            created = self.repos.profiles.add(
                 Profile(
                     user_id=user_id,
                     status=DRAFT,
@@ -77,9 +105,12 @@ class ProfileService:
                     resume_id=resume_id,
                 )
             )
+            log.info("draft created user=%s profile=%s", user_id, created.id)
+            return created
         draft.data = _dump(data)
         if resume_id:
             draft.resume_id = resume_id
+        log.info("draft updated user=%s profile=%s", user_id, draft.id)
         return self.repos.profiles.update(draft)
 
     def approve(self, user_id: uuid.UUID) -> Profile:
@@ -91,8 +122,25 @@ class ProfileService:
         for section, entry_id, label, bullets in _entries(data):
             for b in bullets:
                 rows.append((section, entry_id, label, b))
-        vectors = self.embedder.embed_documents(
-            [f"{label}: {b.text}" for _, _, label, b in rows]
+        started = time.perf_counter()
+        try:
+            vectors = self.embedder.embed_documents(
+                [f"{label}: {b.text}" for _, _, label, b in rows]
+            )
+        except Exception as e:
+            log.error(
+                "approve embedding failed user=%s profile=%s bullets=%d error=%s",
+                user_id,
+                draft.id,
+                len(rows),
+                type(e).__name__,
+            )
+            raise
+        log.debug(
+            "embedded %d bullets with %s in %.2fs",
+            len(rows),
+            self.embedder.name,
+            time.perf_counter() - started,
         )
         version = self.repos.profiles.next_version(user_id)
         index = [
@@ -105,15 +153,28 @@ class ProfileService:
                 entry_label=label,
                 text=b.text,
                 embedding=vec,
+                embedding_model=self.embedder.name,
             )
             for (section, entry_id, label, b), vec in zip(rows, vectors)
         ]
-        return self.repos.profiles.approve(draft, version, datetime.now(UTC), index)
+        approved = self.repos.profiles.approve(draft, version, datetime.now(UTC), index)
+        log.info(
+            "profile approved user=%s profile=%s version=%d bullets=%d embedder=%s",
+            user_id,
+            approved.id,
+            version,
+            len(index),
+            self.embedder.name,
+        )
+        if self.queue is not None:  # indexing is done, so open jobs can be re-scored
+            self.queue.enqueue("rescore_jobs", user_id=str(user_id))
+        return approved
 
     def search_bullets(self, user_id: uuid.UUID, req: BulletSearch) -> BulletSearchOut:
         """Per-query vector search over the approved index, merged and diversity-capped."""
         profile = self.get_approved(user_id)
-        bullets = self.repos.profiles.bullets_for(profile.id)
+        bullets = current_index(self.repos, self.embedder, profile.id)
+        floor = self.embedder.min_score if req.min_score is None else req.min_score
         queries = [q.strip() for q in req.queries if q.strip()]
         qvecs = self.embedder.embed_queries(queries)
 
@@ -127,7 +188,7 @@ class ProfileService:
                 reverse=True,
             )
             for score, b in scored[: req.per_query]:
-                if score <= 0 or math.isnan(score):
+                if score < floor or math.isnan(score):
                     continue
                 prev_score, matched = best.get(b.source_id, (0.0, []))
                 best[b.source_id] = (max(prev_score, score), [*matched, query])
@@ -157,4 +218,14 @@ class ProfileService:
             )
             if len(ranked) >= req.limit:
                 break
+        # Queries are job requirements, not personal data, but keep them out of INFO.
+        log.debug(
+            "bullet search user=%s profile=%s queries=%d bullets=%d floor=%.2f -> %d",
+            user_id,
+            profile.id,
+            len(queries),
+            len(bullets),
+            floor,
+            len(ranked),
+        )
         return BulletSearchOut(profile_version=profile.version or 0, bullets=ranked)

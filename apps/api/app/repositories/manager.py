@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.repositories.job import JobRepository
 from app.repositories.profile import ProfileRepository
 from app.repositories.resume import ResumeRepository
 from app.repositories.user import UserRepository
@@ -10,6 +11,7 @@ class RepositoryManager:
 
     def __init__(self, session: Session) -> None:
         self.session = session
+        self.jobs = JobRepository(session)
         self.profiles = ProfileRepository(session)
         self.resumes = ResumeRepository(session)
         self.users = UserRepository(session)

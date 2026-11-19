@@ -3,19 +3,23 @@ from typing import Annotated
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from app.ai.embeddings import Embedder, HashingEmbedder
-from app.ai.extractor import ClaudeVisionExtractor, ProfileExtractor
+from app.ai.embeddings import Embedder, FastEmbedEmbedder, HashingEmbedder
+from app.ai.extractor import ProfileExtractor
+from app.ai.factory import build_profile_extractor
 from app.core.config import settings
 from app.core.security import Claims
 from app.db.session import get_db
 from app.models.user import User
 from app.repositories.manager import RepositoryManager
+from app.services.job import JobService
 from app.services.profile import ProfileService
 from app.services.resume import ResumeService
 from app.services.user import UserService
 from app.storage.base import Storage
 from app.storage.local import LocalStorage
 from app.storage.s3 import S3Storage
+from app.tasks.queue import TaskQueue
+from app.tasks.runtime import get_queue
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -49,11 +53,13 @@ ResumeServiceDep = Annotated[ResumeService, Depends(get_resume_service)]
 
 
 def get_extractor() -> ProfileExtractor:
-    return ClaudeVisionExtractor(settings.anthropic_api_key, settings.extraction_model)
+    return build_profile_extractor()
 
 
 def get_embedder() -> Embedder:
-    return HashingEmbedder()
+    if settings.embedding_backend == "hashing":
+        return HashingEmbedder()
+    return FastEmbedEmbedder(settings.embedding_model)
 
 
 def get_profile_service(
@@ -61,11 +67,23 @@ def get_profile_service(
     resumes: ResumeServiceDep,
     extractor: Annotated[ProfileExtractor, Depends(get_extractor)],
     embedder: Annotated[Embedder, Depends(get_embedder)],
+    queue: Annotated[TaskQueue, Depends(get_queue)],
 ) -> ProfileService:
-    return ProfileService(repos, resumes, extractor, embedder)
+    return ProfileService(repos, resumes, extractor, embedder, queue)
 
 
 ProfileServiceDep = Annotated[ProfileService, Depends(get_profile_service)]
+
+
+def get_job_service(
+    repos: Repos,
+    storage: Annotated[Storage, Depends(get_storage)],
+    queue: Annotated[TaskQueue, Depends(get_queue)],
+) -> JobService:
+    return JobService(repos, queue, storage)
+
+
+JobServiceDep = Annotated[JobService, Depends(get_job_service)]
 
 
 def get_current_user(claims: Claims, repos: Repos) -> User:

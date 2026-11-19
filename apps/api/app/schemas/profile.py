@@ -77,6 +77,8 @@ class BulletSearch(BaseModel):
     per_query: int = Field(default=5, ge=1, le=20)
     limit: int = Field(default=15, ge=1, le=50)
     max_per_entry: int = Field(default=3, ge=1, le=10)
+    # Similarity floor; defaults to the embedding model's own noise threshold.
+    min_score: float | None = Field(default=None, ge=-1, le=1)
 
 
 class RankedBullet(BaseModel):

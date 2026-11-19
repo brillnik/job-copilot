@@ -128,3 +128,34 @@ def test_users_are_isolated():
     assert (
         client.post("/profile/bullets", json={"queries": ["Kafka"]}).status_code == 404
     )
+
+
+class _V2Embedder:
+    name = "v2"
+    min_score = 0.5
+
+    def embed_documents(self, texts):
+        return [[1.0, 0.0] for _ in texts]
+
+    def embed_queries(self, texts):
+        return [[1.0, 0.0] for _ in texts]
+
+
+def test_search_reembeds_when_embedder_changes(db_session):
+    from app.api.deps import get_embedder
+    from app.models.profile import ProfileBullet
+
+    client.post("/profile/upload", files={"file": ("cv.pdf", PDF)})
+    client.post("/profile/approve")  # indexed with the hashing embedder
+    app.dependency_overrides[get_embedder] = lambda: _V2Embedder()
+    found = client.post("/profile/bullets", json={"queries": ["anything"]}).json()
+    assert len(found["bullets"]) == 3
+    rows = db_session.query(ProfileBullet).all()
+    assert {r.embedding_model for r in rows} == {"v2"}
+
+
+def test_min_score_filters_noise():
+    client.post("/profile/upload", files={"file": ("cv.pdf", PDF)})
+    client.post("/profile/approve")
+    found = client.post("/profile/bullets", json={"queries": ["zzz qqq"]}).json()
+    assert found["bullets"] == []

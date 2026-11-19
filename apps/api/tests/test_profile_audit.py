@@ -152,7 +152,7 @@ def test_put_empty_bullet_is_422_with_path():
     body = {"experience": [{"company": "X", "bullets": [{"text": ""}]}]}
     r = client.put("/profile/draft", json=body)
     assert r.status_code == 422
-    assert "bullets" in r.json()["detail"][0]["loc"]
+    assert "bullets" in r.json()["details"][0]["loc"]
 
 
 # --- §7 approve ------------------------------------------------------------

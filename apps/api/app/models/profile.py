@@ -31,6 +31,11 @@ class Profile(Base):
     status: Mapped[str] = mapped_column(String(16), index=True)
     version: Mapped[int | None] = mapped_column(Integer)
     data: Mapped[dict[str, Any]] = mapped_column(JSON)
+    # Bullet embeddings are built synchronously in approve, so this is "done" as soon
+    # as the row is approved; tailoring checks it so an async indexer can slot in.
+    indexing_state: Mapped[str] = mapped_column(
+        String(16), default="done", server_default="done"
+    )
     resume_id: Mapped[str | None] = mapped_column(
         String(32), ForeignKey("resumes.id", ondelete="SET NULL")
     )
@@ -57,3 +62,4 @@ class ProfileBullet(Base):
     entry_label: Mapped[str] = mapped_column(String(512))
     text: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float]] = mapped_column(JSON)
+    embedding_model: Mapped[str] = mapped_column(String(128))

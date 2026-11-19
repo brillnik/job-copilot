@@ -1,6 +1,9 @@
+import logging
+import ssl
 from functools import lru_cache
 from typing import Annotated, Any
 
+import certifi
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -8,13 +11,19 @@ from jwt import PyJWKClient
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
 bearer = HTTPBearer(auto_error=False)
 
 
 @lru_cache
 def _jwks_client() -> PyJWKClient:
     # Caches keys in-process; refetches when an unknown `kid` shows up.
-    return PyJWKClient(f"https://{settings.auth0_domain}/.well-known/jwks.json")
+    # certifi's CA bundle: python.org builds on macOS ship without root certs,
+    # which breaks the default urllib TLS verification.
+    return PyJWKClient(
+        f"https://{settings.auth0_domain}/.well-known/jwks.json",
+        ssl_context=ssl.create_default_context(cafile=certifi.where()),
+    )
 
 
 def get_signing_key(token: str) -> Any:
@@ -49,6 +58,8 @@ def token_claims(
             options={"require": ["exp", "iat", "iss", "aud", "sub"]},
         )
     except jwt.PyJWTError as e:
+        # The client only sees a generic 401; the real reason stays in the logs.
+        logger.warning("Rejected access token: %s: %s", type(e).__name__, e)
         raise _unauthorized("Invalid token") from e
 
 

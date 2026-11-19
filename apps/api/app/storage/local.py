@@ -16,5 +16,8 @@ class LocalStorage:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
 
+    def read(self, key: str) -> bytes:
+        return self._path(key).read_bytes()
+
     def delete(self, key: str) -> None:
         self._path(key).unlink(missing_ok=True)

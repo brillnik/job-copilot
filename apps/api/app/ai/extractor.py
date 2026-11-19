@@ -7,6 +7,7 @@ from typing import Protocol
 import anthropic
 import pypdf
 
+from app.ai.text import norm
 from app.core.exceptions import ExtractionFailed, ExtractionUnavailable
 from app.schemas.profile import Bullet, Contact, ProfileData
 
@@ -56,10 +57,6 @@ def pdf_text(data: bytes) -> str:
         return ""
 
 
-def _norm(text: str) -> str:
-    return re.sub(r"[\W_]+", "", text.casefold())
-
-
 class _Verbatim:
     """Drops extracted strings that do not appear in the source text.
 
@@ -68,10 +65,10 @@ class _Verbatim:
     """
 
     def __init__(self, source: str) -> None:
-        self.source = _norm(source)
+        self.source = norm(source)
 
     def ok(self, value: str | None) -> bool:
-        return not value or _norm(value) in self.source
+        return not value or norm(value) in self.source
 
     def text(self, value: str | None) -> str | None:
         return value if self.ok(value) else None
