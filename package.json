@@ -4,6 +4,7 @@
   "workspaces": ["apps/web"],
   "scripts": {
     "dev": "concurrently -n api,web -c blue,green \"bun run dev:api\" \"bun run dev:web\"",
+    "dev:all": "./scripts/dev-all.sh",
     "dev:web": "bun run --cwd apps/web dev",
     "db:up": "docker compose up -d --wait postgres minio minio-init",
     "db:migrate": "cd apps/api && uv run alembic upgrade head",

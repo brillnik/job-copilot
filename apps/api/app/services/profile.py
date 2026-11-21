@@ -182,6 +182,8 @@ class ProfileService:
             self.embedder.name,
         )
         if self.queue is not None:  # indexing is done, so open jobs can be re-scored
+            # a fresh profile means a fresh "For you" digest, without waiting for tomorrow
+            self.queue.enqueue("build_recommendations", user_id=str(user_id))
             self.queue.enqueue("rescore_jobs", user_id=str(user_id))
         return approved
 

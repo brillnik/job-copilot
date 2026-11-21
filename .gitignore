@@ -16,3 +16,5 @@ apps/api/*.db
 .auth0-mcp-state.json
 
 .auth0-mcp-writes.log
+
+.dev-logs/

@@ -388,3 +388,68 @@ def test_two_user_isolation(db_session, tmp_path):
     as_user("auth0|A")
     other = client.post(f"/recommendations/{b_item['id']}/save")
     assert other.status_code == 404
+
+
+# --- automatic listing: refresh + approve -------------------------------------------
+@pytest.fixture
+def fresh_cooldown(monkeypatch):
+    from app.services import recommendation
+
+    monkeypatch.setattr(recommendation, "_last_sync", float("-inf"))
+
+
+def test_refresh_with_an_empty_catalogue_runs_discovery_once(
+    db_session, queue, fresh_cooldown
+):
+    seed(db_session)
+    r = client.post("/recommendations/refresh")
+    assert r.status_code == 202 and r.json() == {"status": "syncing"}
+    assert queue.names() == ["sync_catalog"]
+    # a second click (or another user) inside the cooldown must not start another sync
+    assert client.post("/recommendations/refresh").json() == {"status": "syncing"}
+    assert queue.names() == ["sync_catalog"]
+
+
+def test_refresh_builds_the_digest_when_the_catalogue_has_jobs(
+    db_session, queue, fresh_cooldown
+):
+    user = seed(db_session)
+    make_catalog(db_session, external_id="1", jd=jd_for("Python Dev"))
+    r = client.post("/recommendations/refresh")
+    assert r.json() == {"status": "building"}
+    assert queue.calls == [("build_recommendations", {"user_id": str(user.id)})]
+
+
+def test_refresh_does_nothing_when_todays_digest_exists(
+    db_session, queue, fresh_cooldown
+):
+    user = seed(db_session)
+    job = make_catalog(db_session, external_id="1", jd=jd_for("Python Dev"))
+    db_session.add(
+        Recommendation(
+            user_id=user.id, catalog_job_id=job.id, score=80, digest_date=local_day()
+        )
+    )
+    db_session.commit()
+    assert client.post("/recommendations/refresh").json() == {"status": "ready"}
+    assert queue.calls == []
+
+
+def test_refresh_is_per_user(db_session, queue, fresh_cooldown):
+    a = seed(db_session)
+    seed(db_session, "auth0|B")
+    job = make_catalog(db_session, external_id="1", jd=jd_for("Python Dev"))
+    db_session.add(
+        Recommendation(
+            user_id=a.id, catalog_job_id=job.id, score=80, digest_date=local_day()
+        )
+    )
+    db_session.commit()
+    as_user("auth0|B")  # B has no digest of their own, whatever A has
+    assert client.post("/recommendations/refresh").json() == {"status": "building"}
+
+
+def test_approving_a_profile_queues_a_digest_build(db_session, queue):
+    user = make_user(db_session)
+    approve_profile(db_session, user, queue=queue)
+    assert queue.names() == ["build_recommendations", "rescore_jobs"]

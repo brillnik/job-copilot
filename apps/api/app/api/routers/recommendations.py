@@ -1,9 +1,14 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, status
 
 from app.api.deps import CurrentUser
 from app.api.deps_discovery import RecommendationServiceDep
 from app.core.exceptions import ErrorBody
-from app.schemas.recommendation import DismissIn, RecommendationList, RecommendationOut
+from app.schemas.recommendation import (
+    DismissIn,
+    RecommendationList,
+    RecommendationOut,
+    RefreshOut,
+)
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
@@ -17,6 +22,15 @@ ERRORS = {
 def todays_digest(user: CurrentUser, service: RecommendationServiceDep):
     """Today's recommendations (dismissed ones are hidden)."""
     return RecommendationList(items=service.today(user.id))
+
+
+@router.post(
+    "/refresh", response_model=RefreshOut, status_code=status.HTTP_202_ACCEPTED
+)
+def refresh_digest(user: CurrentUser, service: RecommendationServiceDep):
+    """Build today's digest now instead of waiting for the daily run. If the catalogue
+    is still empty, discovery runs first. Poll GET /recommendations afterwards."""
+    return RefreshOut(status=service.refresh(user.id))
 
 
 @router.post(

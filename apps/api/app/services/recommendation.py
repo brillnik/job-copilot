@@ -4,6 +4,7 @@ Logs carry ids and counts only.
 """
 
 import logging
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -205,6 +206,10 @@ def _out(
     )
 
 
+_last_sync = float("-inf")
+SYNC_COOLDOWN_S = 30 * 60
+
+
 class RecommendationService:
     def __init__(
         self, repos: RepositoryManager, queue: TaskQueue, ctx: ScoringContext
@@ -231,6 +236,30 @@ class RecommendationService:
 
     def today(self, user_id: uuid.UUID) -> list[RecommendationOut]:
         return self._present(self.repos.recommendations.digest(user_id, local_day()))
+
+    def refresh(self, user_id: uuid.UUID) -> str:
+        """Make sure the user has a digest without waiting for the daily run.
+
+        Returns ready | building | syncing. Cheap and idempotent: enqueues at most one
+        task per call, and discovery itself at most once per cooldown (in this process).
+        """
+        global _last_sync
+        if self.repos.recommendations.digest(user_id, local_day()):
+            return "ready"
+        if self.repos.catalog.count_open() == 0:
+            now = time.monotonic()
+            if now - _last_sync > SYNC_COOLDOWN_S:
+                _last_sync = now
+                self.queue.enqueue(
+                    "sync_catalog"
+                )  # finishes by queueing every user's digest
+            log.info(
+                "recommendations refresh user=%s: catalogue empty, syncing", user_id
+            )
+            return "syncing"
+        self.queue.enqueue("build_recommendations", user_id=str(user_id))
+        log.info("recommendations refresh user=%s: building", user_id)
+        return "building"
 
     def dismiss(
         self, user_id: uuid.UUID, rec_id: str, reason: str | None

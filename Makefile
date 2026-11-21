@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install setup env dev dev-api dev-web db-up db-down db-migrate gen-api build lint test clean
+.PHONY: all help install setup env dev dev-api dev-web db-up db-down db-migrate gen-api build lint test clean
 
 API := apps/api
 
@@ -15,6 +15,9 @@ env: ## Create .env files from examples if missing
 	@test -f apps/web/.env.local || cp apps/web/.env.example apps/web/.env.local
 
 setup: install env db-up db-migrate ## Full first-time setup
+
+all: ## Run EVERYTHING: db, migrations, Ollama, api, web, scheduler (scripts/dev-all.sh)
+	./scripts/dev-all.sh
 
 dev: ## Run api and web together
 	bun run dev

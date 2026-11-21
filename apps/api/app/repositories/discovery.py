@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.clock import as_utc
@@ -55,6 +55,16 @@ class CatalogRepository(BaseRepository[CatalogJob]):
             select(CatalogJob).where(
                 CatalogJob.source == source, CatalogJob.external_id == external_id
             )
+        )
+
+    def count_open(self) -> int:
+        return (
+            self.session.scalar(
+                select(func.count())
+                .select_from(CatalogJob)
+                .where(CatalogJob.closed_at.is_(None))
+            )
+            or 0
         )
 
     def by_id(self, catalog_job_id: str) -> CatalogJob | None:

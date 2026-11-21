@@ -26,3 +26,9 @@ class RecommendationList(BaseModel):
 
 class DismissIn(BaseModel):
     reason: str | None = Field(default=None, max_length=200)
+
+
+class RefreshOut(BaseModel):
+    # ready: today's digest already exists; building: a digest is being built from the
+    # catalogue; syncing: the catalogue is empty so discovery is running first.
+    status: Literal["ready", "building", "syncing"]
