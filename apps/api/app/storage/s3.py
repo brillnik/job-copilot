@@ -30,3 +30,21 @@ class S3Storage:
 
     def delete(self, key: str) -> None:
         self.client.delete_object(Bucket=self.bucket, Key=key)
+
+    def list_prefix(self, prefix: str) -> list[str]:
+        keys: list[str] = []
+        pages = self.client.get_paginator("list_objects_v2").paginate(
+            Bucket=self.bucket, Prefix=prefix
+        )
+        for page in pages:
+            keys.extend(o["Key"] for o in page.get("Contents", []))
+        return keys
+
+    def delete_prefix(self, prefix: str) -> int:
+        keys = self.list_prefix(prefix)
+        for i in range(0, len(keys), 1000):
+            self.client.delete_objects(
+                Bucket=self.bucket,
+                Delete={"Objects": [{"Key": k} for k in keys[i : i + 1000]]},
+            )
+        return len(keys)

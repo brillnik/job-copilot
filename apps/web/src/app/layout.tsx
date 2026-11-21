@@ -1,16 +1,22 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
+import { ToastProvider } from "@/components/ui/toast";
+import { noFlashScript } from "@/lib/theme";
 import { QueryProvider } from "@/providers/query-provider";
+import { ThemeProvider } from "@/providers/theme-provider";
 import "./globals.css";
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Scores, CTC, metrics and ids.
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
@@ -20,12 +26,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    // suppressHydrationWarning: the inline script adds `dark` before React hydrates.
     <html
       lang="en"
-      className={`${inter.variable} ${geistMono.variable} h-full font-sans antialiased`}
+      suppressHydrationWarning
+      className={`${inter.variable} ${jetbrainsMono.variable} h-full font-sans antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <QueryProvider>{children}</QueryProvider>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: noFlashScript }} />
+      </head>
+      <body className="min-h-full">
+        <ThemeProvider>
+          <QueryProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </QueryProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

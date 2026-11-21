@@ -15,6 +15,7 @@ from app.models.job import (
     RunQuota,
     UserAnswer,
 )
+from app.models.run import RunEvent
 from app.repositories.base import BaseRepository
 
 
@@ -189,6 +190,10 @@ class JobRepository(BaseRepository[Job]):
         profile_version: int,
         day: str,
         cap: int,
+        *,
+        max_pages: int | None = None,
+        guidance: dict | None = None,
+        autopilot: bool = False,
     ) -> AgentRun:
         """Atomically take a daily-cap slot and create the run, in one transaction.
 
@@ -207,8 +212,26 @@ class JobRepository(BaseRepository[Job]):
         if not taken:
             self.session.rollback()
             raise QuotaExceeded(self.quota_used(user_id, day))
-        run = AgentRun(user_id=user_id, job_id=job.id, profile_version=profile_version)
+        run = AgentRun(
+            id=uuid.uuid4().hex,
+            user_id=user_id,
+            job_id=job.id,
+            profile_version=profile_version,
+            max_pages=max_pages,
+            guidance=guidance,
+            autopilot=autopilot,
+            event_seq=1,
+        )
         self.session.add(run)
+        self.session.add(
+            RunEvent(
+                run_id=run.id,
+                user_id=user_id,
+                seq=1,
+                type="status",
+                payload={"status": "queued", "from": None, "reason": None},
+            )
+        )
         job.status = "tailoring"
         try:
             self.session.commit()
@@ -235,9 +258,13 @@ class JobRepository(BaseRepository[Job]):
 
     # --- events / images ----------------------------------------------------
     def add_event(self, user_id: uuid.UUID, type_: str, payload: dict) -> Event:
+        ev = self.stage_event(user_id, type_, payload)
+        self.session.commit()
+        return ev
+
+    def stage_event(self, user_id: uuid.UUID, type_: str, payload: dict) -> Event:
         ev = Event(user_id=user_id, type=type_, payload=payload)
         self.session.add(ev)
-        self.session.commit()
         return ev
 
     def events_after(self, user_id: uuid.UUID, after: int, limit: int) -> list[Event]:

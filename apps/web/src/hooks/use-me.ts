@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api/browser";
+import { unwrap } from "@/lib/api/unwrap";
 
 export const meKey = ["me"] as const;
 
@@ -9,10 +10,6 @@ export const meKey = ["me"] as const;
 export function useMe() {
   return useQuery({
     queryKey: meKey,
-    queryFn: async () => {
-      const { data, error } = await api.GET("/me");
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => unwrap(api.GET("/me")),
   });
 }

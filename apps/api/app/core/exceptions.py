@@ -55,6 +55,18 @@ class EmptyFile(AppError):
     detail = "File is empty"
 
 
+class Unauthorized(AppError):
+    status_code = status.HTTP_401_UNAUTHORIZED
+    code = "unauthorized"
+    detail = "Authentication required"
+
+
+class Forbidden(AppError):
+    status_code = status.HTTP_403_FORBIDDEN
+    code = "forbidden"
+    detail = "Forbidden"
+
+
 class NotFound(AppError):
     status_code = status.HTTP_404_NOT_FOUND
     code = "not_found"

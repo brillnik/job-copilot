@@ -1,0 +1,25 @@
+# Apply worker image (separate container, `apply` queue). Not used by the API image.
+#
+# Browser: the worker drives a Google Chrome with a DEDICATED profile that the user has
+# logged in to (APPLY_BROWSER_MODE=cdp|chrome, see app/apply/drivers.py). On a laptop
+# run the worker directly (`uv run python -m app.apply.worker serve`) against the
+# local Chrome; this image is for a headless server install (channel="chrome").
+#
+# Egress: the worker's HostPolicy already aborts every request except the target host
+# and our API, and refuses wellfound/naukri/hiring.cafe/linkedin. Enforce the same at
+# the network layer (deployment): allow only the ATS hosts (greenhouse.io, lever.co,
+# ashbyhq.com, himalayas.app and the employer's board) and our API; deny all else.
+FROM mcr.microsoft.com/playwright/python:v1.65.0-jammy
+RUN apt-get update && apt-get install -y --no-install-recommends wget gnupg \
+ && wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/chrome.gpg \
+ && echo "deb [signed-by=/usr/share/keyrings/chrome.gpg arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/chrome.list \
+ && apt-get update && apt-get install -y --no-install-recommends google-chrome-stable \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv sync --frozen --no-dev
+COPY app ./app
+ENV APPLY_BROWSER_MODE=chrome APPLY_HEADLESS=true APPLY_WORKER_MODE=external \
+    APPLY_CHROME_USER_DATA_DIR=/profile
+VOLUME /profile
+CMD ["uv", "run", "python", "-m", "app.apply.worker", "serve"]

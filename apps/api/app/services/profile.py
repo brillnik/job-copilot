@@ -113,6 +113,21 @@ class ProfileService:
         log.info("draft updated user=%s profile=%s", user_id, draft.id)
         return self.repos.profiles.update(draft)
 
+    def add_confirmed_skill(self, user_id: uuid.UUID, skill: str) -> Profile | None:
+        """Add a skill the user just confirmed to their draft (made from the approved
+        profile if there is no draft yet). It is only claimable on a resume once they
+        approve the draft, like any other profile edit."""
+        draft = self.repos.profiles.get_draft(user_id)
+        base = draft or self.repos.profiles.get_latest_approved(user_id)
+        if base is None:
+            return None
+        data = ProfileData.model_validate(base.data)
+        if skill.lower() in {s.lower() for s in data.skills}:
+            return draft
+        data.skills = [*data.skills, skill]
+        log.info("confirmed skill added to draft user=%s", user_id)
+        return self._save_draft(user_id, data, None)
+
     def approve(self, user_id: uuid.UUID) -> Profile:
         """Freeze the draft as a new version and index its bullets for retrieval."""
         draft = self.get_draft(user_id)

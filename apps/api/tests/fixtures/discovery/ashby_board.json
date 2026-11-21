@@ -1,0 +1,22 @@
+{
+ "jobs": [
+  {
+   "id": "b1",
+   "title": "Full Stack Engineer",
+   "location": "Pune",
+   "isRemote": false,
+   "isListed": true,
+   "descriptionPlain": "Build features end to end in TypeScript.",
+   "jobUrl": "https://jobs.ashbyhq.com/gamma/b1",
+   "applyUrl": "https://jobs.ashbyhq.com/gamma/b1/application"
+  },
+  {
+   "id": "b2",
+   "title": "Hidden role",
+   "location": "Pune",
+   "isListed": false,
+   "descriptionPlain": "x",
+   "jobUrl": "https://jobs.ashbyhq.com/gamma/b2"
+  }
+ ]
+}

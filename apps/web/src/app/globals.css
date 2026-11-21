@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-/* Design tokens (from the Job Copilot design). Components use the Tailwind
-   utilities mapped below, e.g. bg-surface, text-muted, border-border. */
+/* Design tokens. Light is the default; the dark set applies under
+   <html class="dark"> (set by ThemeProvider / the inline script in layout). */
 :root {
   --bg: #f6f6f7;
   --surface: #ffffff;
@@ -18,30 +18,44 @@
   --on-accent: #ffffff;
   --ok: #12703a;
   --ok-soft: #e5f4eb;
+  --warn: #8f4f08;
+  --warn-soft: #fdf1e0;
   --bad: #b4231f;
+  --bad-soft: #fceae9;
+  --add: #d9f2e1;
+  --add-text: #0d552b;
+  --del: #fbe1df;
+  --del-text: #8a1c17;
   --focus: #4b4fd8;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d0d10;
-    --surface: #16161b;
-    --surface-2: #1e1e25;
-    --border: #2a2a33;
-    --border-strong: #3d3d48;
-    --text: #ededf0;
-    --muted: #b6b6c0;
-    --subtle: #9c9ca7;
-    --accent: #8c8fff;
-    --accent-hover: #a4a6ff;
-    --accent-soft: #24244a;
-    --accent-text: #b6b8ff;
-    --on-accent: #0d0d10;
-    --ok: #4ade80;
-    --ok-soft: #0f2a1a;
-    --bad: #f87171;
-    --focus: #a4a6ff;
-  }
+.dark {
+  --bg: #0d0d10;
+  --surface: #16161b;
+  --surface-2: #1e1e25;
+  --border: #2a2a33;
+  --border-strong: #3d3d48;
+  --text: #ededf0;
+  --muted: #b6b6c0;
+  --subtle: #9c9ca7;
+  --accent: #8c8fff;
+  --accent-hover: #a4a6ff;
+  --accent-soft: #24244a;
+  --accent-text: #b6b8ff;
+  --on-accent: #0d0d10;
+  --ok: #4ade80;
+  --ok-soft: #0f2a1a;
+  --warn: #f5b454;
+  --warn-soft: #2d200c;
+  --bad: #f87171;
+  --bad-soft: #2f1515;
+  --add: #123321;
+  --add-text: #8ef0b2;
+  --del: #3d1817;
+  --del-text: #fda9a4;
+  --focus: #a4a6ff;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -60,10 +74,38 @@
   --color-on-accent: var(--on-accent);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
   --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-add: var(--add);
+  --color-add-text: var(--add-text);
+  --color-del: var(--del);
+  --color-del-text: var(--del-text);
   --color-focus: var(--focus);
-  --font-sans: var(--font-inter);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  /* Type scale: page 28/600, screen 22/600, section 16/600, body 14,
+     hint 12.5, eyebrow 11.5 (600, uppercase, 0.08em). Weight is set with
+     font-semibold at the call site (or the Eyebrow component). */
+  --text-page: 28px;
+  --text-page--line-height: 1.2;
+  --text-screen: 22px;
+  --text-screen--line-height: 1.25;
+  --text-section: 16px;
+  --text-section--line-height: 1.35;
+  --text-body: 14px;
+  --text-body--line-height: 1.5;
+  --text-hint: 12.5px;
+  --text-hint--line-height: 1.45;
+  --text-eyebrow: 11.5px;
+  --text-eyebrow--line-height: 1.3;
+  --tracking-eyebrow: 0.08em;
+
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-card-mobile: 18px;
 }
 
 body {
@@ -76,4 +118,14 @@ body {
 :focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

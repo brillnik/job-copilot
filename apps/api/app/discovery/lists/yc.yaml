@@ -1,0 +1,8 @@
+# Starter list of YC companies to crawl. Curate freely; `sync-lists` upserts by name.
+# Fields: name, careers_url. ats/board_token are filled in by the ATS detector.
+companies:
+  - {name: Razorpay, careers_url: "https://razorpay.com/jobs/"}
+  - {name: Meesho, careers_url: "https://careers.meesho.com/"}
+  - {name: Groww, careers_url: "https://groww.in/careers"}
+  - {name: Airbyte, careers_url: "https://airbyte.com/company/careers"}
+  - {name: Retool, careers_url: "https://retool.com/careers"}

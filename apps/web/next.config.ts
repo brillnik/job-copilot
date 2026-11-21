@@ -12,6 +12,11 @@ for (const file of [`.env.${appEnv}`, ".env"]) {
 }
 
 const nextConfig: NextConfig = {
+  // The e2e servers use their own dist dir so they can run next to `bun run dev`.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
+  redirects: async () => [
+    { source: "/signin", destination: "/sign-in", permanent: false },
+  ],
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

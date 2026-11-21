@@ -43,7 +43,7 @@ def get_me(tok=None):
 def test_valid_token():
     r = get_me(token())
     assert r.status_code == 200
-    assert r.json()["auth0_sub"] == "auth0|123"
+    assert r.json()["auth_providers"] == ["auth0"]
 
 
 def test_missing_token():

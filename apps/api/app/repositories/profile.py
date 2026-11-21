@@ -22,6 +22,15 @@ class ProfileRepository(BaseRepository[Profile]):
             .limit(1)
         )
 
+    def get_version(self, user_id: uuid.UUID, version: int) -> Profile | None:
+        return self.session.scalar(
+            select(Profile).where(
+                Profile.user_id == user_id,
+                Profile.status == APPROVED,
+                Profile.version == version,
+            )
+        )
+
     def next_version(self, user_id: uuid.UUID) -> int:
         current = self.session.scalar(
             select(func.max(Profile.version)).where(Profile.user_id == user_id)

@@ -1,0 +1,6 @@
+# Starter list of India-based AI companies. Curate freely; `sync-lists` upserts by name.
+companies:
+  - {name: Sarvam AI, careers_url: "https://www.sarvam.ai/careers"}
+  - {name: Krutrim, careers_url: "https://www.olakrutrim.com/careers"}
+  - {name: Observe.AI, careers_url: "https://www.observe.ai/careers"}
+  - {name: Uniphore, careers_url: "https://www.uniphore.com/careers/"}

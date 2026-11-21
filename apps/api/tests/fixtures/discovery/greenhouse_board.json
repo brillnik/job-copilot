@@ -1,0 +1,27 @@
+{
+ "jobs": [
+  {
+   "id": 4001,
+   "title": "Backend Engineer",
+   "absolute_url": "https://boards.greenhouse.io/acme/jobs/4001",
+   "location": {
+    "name": "Bengaluru, India"
+   },
+   "updated_at": "2026-11-01T10:00:00Z",
+   "content": "&lt;p&gt;Build Python services with Postgres and Kafka.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;3+ years experience&lt;/li&gt;&lt;/ul&gt;"
+  },
+  {
+   "id": 4002,
+   "title": "Data Scientist",
+   "absolute_url": "https://boards.greenhouse.io/acme/jobs/4002",
+   "location": {
+    "name": "Remote - India"
+   },
+   "updated_at": "2026-11-02T10:00:00Z",
+   "content": "&lt;p&gt;Model things with Python.&lt;/p&gt;"
+  }
+ ],
+ "meta": {
+  "total": 2
+ }
+}

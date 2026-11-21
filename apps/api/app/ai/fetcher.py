@@ -10,6 +10,7 @@ import httpx
 import trafilatura
 
 from app.ai.errors import TransientError
+from app.core.netguard import is_denied
 
 
 class FetchError(Exception):
@@ -179,6 +180,8 @@ class HttpJobFetcher:
 
     def _get(self, url: str) -> bytes:
         for _ in range(self.max_redirects + 1):
+            if is_denied(url):  # never fetched from the server, whatever the caller
+                raise BlockedURL("This site cannot be read automatically")
             assert_public_url(url, self.resolve)
             try:
                 with self.client.stream(

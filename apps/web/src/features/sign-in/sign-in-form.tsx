@@ -8,7 +8,8 @@ import { Form } from "@/components/form/form";
 import { SubmitButton } from "@/components/form/submit-button";
 import { TextField } from "@/components/form/text-field";
 import { Button } from "@/components/ui/button";
-import { GOOGLE_CONNECTION, login } from "./login";
+import { rememberConsentTick } from "@/lib/policy";
+import { EMAIL_CONNECTION, GOOGLE_CONNECTION, login } from "./login";
 
 const schema = z.object({
   email: z.string().trim().min(1, "Enter your email").email("Enter a valid email"),
@@ -27,13 +28,22 @@ export function SignInForm() {
   return (
     <Form
       form={form}
-      onSubmit={({ email }) => login({ login_hint: email })}
+      onSubmit={({ email }) => {
+        rememberConsentTick();
+        login({
+          login_hint: email,
+          ...(EMAIL_CONNECTION ? { connection: EMAIL_CONNECTION } : {}),
+        });
+      }}
       className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-6"
     >
       <Button
         block
         disabled={!consent}
-        onClick={() => login({ connection: GOOGLE_CONNECTION })}
+        onClick={() => {
+          rememberConsentTick();
+          login({ connection: GOOGLE_CONNECTION });
+        }}
       >
         <svg
           width="18"

@@ -1,0 +1,32 @@
+[
+ {
+  "id": "aaaa-1111",
+  "text": "Platform Engineer",
+  "hostedUrl": "https://jobs.lever.co/beta/aaaa-1111",
+  "applyUrl": "https://jobs.lever.co/beta/aaaa-1111/apply",
+  "categories": {
+   "location": "Mumbai",
+   "commitment": "Full-time",
+   "team": "Platform"
+  },
+  "workplaceType": "hybrid",
+  "descriptionPlain": "Run our platform on Kubernetes.",
+  "lists": [
+   {
+    "text": "Requirements",
+    "content": "<li>Go</li><li>Kubernetes</li>"
+   }
+  ],
+  "additionalPlain": "We are an equal opportunity employer."
+ },
+ {
+  "id": "aaaa-2222",
+  "text": "Remote ML Engineer",
+  "hostedUrl": "https://jobs.lever.co/beta/aaaa-2222",
+  "categories": {
+   "location": "Remote"
+  },
+  "workplaceType": "remote",
+  "descriptionPlain": "Train models."
+ }
+]

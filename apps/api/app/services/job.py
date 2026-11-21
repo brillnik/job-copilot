@@ -5,9 +5,9 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import BinaryIO
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
-from zoneinfo import ZoneInfo
 
 from app.agent.scoring import musts_summary
+from app.core.clock import local_day
 from app.core.config import settings
 from app.core.exceptions import (
     AppError,
@@ -42,6 +42,7 @@ from app.schemas.job import (
     RunRef,
     TailorIn,
 )
+from app.services.prefs import preferences_of
 from app.storage.base import Storage
 from app.tasks.jobs import content_hash, normalise_text
 from app.tasks.queue import TaskQueue
@@ -82,15 +83,6 @@ def normalise_url(raw: str) -> str:
     )
     path = p.path.rstrip("/")
     return urlunparse((p.scheme.lower(), host, path, "", urlencode(query), ""))
-
-
-def local_day(now: datetime | None = None) -> str:
-    return (
-        (now or datetime.now(UTC))
-        .astimezone(ZoneInfo(settings.day_timezone))
-        .date()
-        .isoformat()
-    )
 
 
 def _summary(job: Job, jd: dict | None) -> JobSummary:
@@ -371,7 +363,17 @@ class JobService:
         )
 
     # --- tailor -------------------------------------------------------------
-    def tailor(self, user_id: uuid.UUID, job_id: str, body: TailorIn) -> str:
+    def tailor(
+        self,
+        user_id: uuid.UUID,
+        job_id: str,
+        body: TailorIn,
+        *,
+        max_pages: int | None = None,
+        guidance: dict | None = None,
+        autopilot: bool = False,
+    ) -> str:
+        """Start a run. `max_pages` / `guidance` are set by POST /runs/{id}/regenerate."""
         job = self._own(user_id, job_id)
 
         def refuse(reason: str, **extra: object) -> None:
@@ -417,10 +419,26 @@ class JobService:
                 details={"run_id": active.id},
             )  # fmt: skip
 
-        day, cap = local_day(), settings.daily_run_cap
+        prefs = preferences_of(self.repos.users.get(user_id))
+        day = local_day()
+        cap = min(prefs.daily_cap, settings.daily_cap_max)
+        ext = self.repos.jobs.extraction_for(user_id, job.id)
+        pages = (
+            max_pages
+            or job.max_pages_override
+            or (prefs.default_length if prefs.default_length != "auto" else None)
+            or (ext.jd.get("requested_resume_pages") if ext else None)
+        )
         try:
             run = self.repos.jobs.reserve_run(
-                user_id, job, profile.version or 0, day, cap
+                user_id,
+                job,
+                profile.version or 0,
+                day,
+                cap,
+                max_pages=pages,
+                guidance=guidance,
+                autopilot=autopilot,
             )
         except QuotaExceeded as e:
             log.warning(

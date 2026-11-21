@@ -7,3 +7,10 @@ export function login(params: Record<string, string> = {}) {
 }
 
 export const GOOGLE_CONNECTION = "google-oauth2";
+
+// Auth0 connection used for "Continue with email". When unset the Auth0 login
+// page decides (database login or, if enabled, a passwordless email code). Set
+// NEXT_PUBLIC_AUTH0_EMAIL_CONNECTION=email to force the Passwordless email
+// connection (one-time code), which must be enabled for this app in the tenant.
+export const EMAIL_CONNECTION =
+  process.env.NEXT_PUBLIC_AUTH0_EMAIL_CONNECTION || undefined;

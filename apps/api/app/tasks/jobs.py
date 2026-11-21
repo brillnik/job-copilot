@@ -21,6 +21,7 @@ from app.agent.scoring import (
     ScoringConfig,
     score_job,
 )
+from app.agent.tailor import TailorAgent
 from app.ai.embeddings import Embedder
 from app.ai.errors import TransientError
 from app.ai.fetcher import FetchError, JobTextFetcher, is_login_walled
@@ -31,8 +32,11 @@ from app.models.job import ARCHIVED, FAILED, NEEDS_PASTE, NEW, Job
 from app.repositories.manager import RepositoryManager
 from app.schemas.job import JobDescription
 from app.schemas.profile import ProfileData
+from app.services.mail import Mailer
+from app.services.prefs import preferences_of
 from app.services.profile_index import approved_with_index
 from app.storage.base import Storage
+from app.tasks.queue import TaskQueue
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +51,10 @@ class TaskContext:
     embedder: Embedder
     scoring: ScoringConfig
     sleep: Callable[[float], None] = time.sleep
+    # Not built yet: with no agent, `tailor` leaves runs queued (see tasks/runs.py).
+    agent: TailorAgent | None = None
+    mailer: Mailer | None = None
+    queue: TaskQueue | None = None  # for follow-up tasks (e.g. render_pdf)
 
 
 def scoring_config() -> ScoringConfig:
@@ -112,6 +120,17 @@ def years_of_experience(data: ProfileData, today: date | None = None) -> float |
     return round(total / 12, 1)
 
 
+def prefs_for_scoring(user) -> Prefs:
+    """The user's saved preferences as scoring inputs (zero CTC / no cities = unknown)."""
+    p = preferences_of(user)
+    cities = tuple(c for c in p.cities if c != "Remote")
+    return Prefs(
+        expected_ctc_lpa=p.expected_ctc_lpa or None,
+        cities=cities,
+        open_to_remote="Remote" in p.cities or not p.cities,
+    )
+
+
 class Scorer:
     """Scores jobs against one user's APPROVED profile; all lookups filter by user_id."""
 
@@ -132,6 +151,7 @@ class Scorer:
                 location=data.contact.location,
             )
         self._cache: dict[str, tuple[str, float] | None] = {}
+        self.prefs = prefs_for_scoring(repos.users.get(user_id))
 
     def _evidence(self, skill: str) -> tuple[str, float] | None:
         if skill in self._cache:
@@ -150,7 +170,7 @@ class Scorer:
 
     def score(self, jd: JobDescription) -> ScoreResult:
         return score_job(
-            jd, self.facts, self.answers, self._evidence, self.cfg, Prefs()
+            jd, self.facts, self.answers, self._evidence, self.cfg, self.prefs
         )
 
 
@@ -308,15 +328,3 @@ def rescore_jobs(ctx: TaskContext, user_id: uuid.UUID | str) -> int:
         repos.jobs.add_event(user_id, "jobs_rescored", {"count": count})
         log.info("rescore_jobs done user=%s rescored=%d", user_id, count)
         return count
-
-
-# --- tailor (stub) ----------------------------------------------------------
-def tailor(ctx: TaskContext, user_id: uuid.UUID | str, run_id: str) -> None:
-    user_id = uuid.UUID(str(user_id))
-    with ctx.session_factory() as session:
-        run = RepositoryManager(session).jobs.get_run(user_id, run_id)
-        if run is None:
-            return
-        # TODO: the tailoring agent is not built yet. The run stays "queued", pinned
-        # to its profile_version, until the agent exists.
-        log.info("tailor stub run=%s profile_version=%s", run.id, run.profile_version)

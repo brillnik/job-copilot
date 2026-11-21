@@ -1,3 +1,5 @@
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from typing import Annotated
 
 from fastapi import Depends
@@ -8,12 +10,22 @@ from app.ai.extractor import ProfileExtractor
 from app.ai.factory import build_profile_extractor
 from app.core.config import settings
 from app.core.security import Claims
-from app.db.session import get_db
+from app.db.session import SessionLocal, get_db
 from app.models.user import User
 from app.repositories.manager import RepositoryManager
+from app.services.account import AccountService
+from app.services.application import ApplicationService
+from app.services.autopilot import AutopilotService
+from app.services.gmail import GmailService
+from app.services.google import GoogleClient, HttpGoogleClient
+from app.services.identity import IdentityProvider, NoopIdentityProvider
 from app.services.job import JobService
 from app.services.profile import ProfileService
 from app.services.resume import ResumeService
+from app.services.run import RunService
+from app.services.screening import ScreeningService
+from app.services.settings import SettingsService
+from app.services.tracker import TrackerService
 from app.services.user import UserService
 from app.storage.base import Storage
 from app.storage.local import LocalStorage
@@ -86,8 +98,111 @@ def get_job_service(
 JobServiceDep = Annotated[JobService, Depends(get_job_service)]
 
 
+def get_run_service(
+    repos: Repos,
+    storage: Annotated[Storage, Depends(get_storage)],
+    queue: Annotated[TaskQueue, Depends(get_queue)],
+    jobs: JobServiceDep,
+    profiles: ProfileServiceDep,
+) -> RunService:
+    return RunService(repos, queue, storage, jobs, profiles)
+
+
+RunServiceDep = Annotated[RunService, Depends(get_run_service)]
+
+
+def get_tracker_service(repos: Repos) -> TrackerService:
+    return TrackerService(repos)
+
+
+TrackerServiceDep = Annotated[TrackerService, Depends(get_tracker_service)]
+
+
+def get_identity_provider() -> IdentityProvider:
+    return NoopIdentityProvider()
+
+
+def get_account_service(
+    repos: Repos,
+    queue: Annotated[TaskQueue, Depends(get_queue)],
+    idp: Annotated[IdentityProvider, Depends(get_identity_provider)],
+) -> AccountService:
+    return AccountService(repos, queue, idp)
+
+
+AccountServiceDep = Annotated[AccountService, Depends(get_account_service)]
+
+
+def get_settings_service(
+    repos: Repos, queue: Annotated[TaskQueue, Depends(get_queue)]
+) -> SettingsService:
+    return SettingsService(repos, queue)
+
+
+SettingsServiceDep = Annotated[SettingsService, Depends(get_settings_service)]
+
+
+def get_session_factory():
+    """Long-lived streams open short sessions of their own instead of holding one."""
+    return SessionLocal
+
+
+SessionFactory = Annotated[
+    Callable[[], AbstractContextManager[Session]], Depends(get_session_factory)
+]
+
+
 def get_current_user(claims: Claims, repos: Repos) -> User:
     return UserService(repos).get_or_create(claims)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+# --- Gmail reply tracking ------------------------------------------------------
+def get_google_client() -> GoogleClient:
+    return HttpGoogleClient(
+        settings.google_client_id,
+        settings.google_client_secret,
+        settings.gmail_redirect_uri,
+        settings.gmail_snippet_chars,
+    )
+
+
+def get_gmail_service(
+    repos: Repos,
+    google: Annotated[GoogleClient, Depends(get_google_client)],
+    queue: Annotated[TaskQueue, Depends(get_queue)],
+) -> GmailService:
+    return GmailService(repos, google, queue)
+
+
+GmailServiceDep = Annotated[GmailService, Depends(get_gmail_service)]
+
+
+def get_screening_service(
+    repos: Repos, embedder: Annotated[Embedder, Depends(get_embedder)]
+) -> ScreeningService:
+    return ScreeningService(repos, embedder)
+
+
+ScreeningServiceDep = Annotated[ScreeningService, Depends(get_screening_service)]
+
+
+def get_application_service(
+    repos: Repos,
+    storage: Annotated[Storage, Depends(get_storage)],
+    queue: Annotated[TaskQueue, Depends(get_queue)],
+    screening: ScreeningServiceDep,
+) -> ApplicationService:
+    return ApplicationService(repos, queue, storage, screening)
+
+
+ApplicationServiceDep = Annotated[ApplicationService, Depends(get_application_service)]
+
+
+def get_autopilot_service(repos: Repos) -> AutopilotService:
+    return AutopilotService(repos)
+
+
+AutopilotServiceDep = Annotated[AutopilotService, Depends(get_autopilot_service)]

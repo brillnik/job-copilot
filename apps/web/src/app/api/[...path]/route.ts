@@ -34,6 +34,33 @@ async function proxy(
     cache: "no-store",
   });
 
+  // GET /runs/{id}/pdf answers 302 -> signed /files/{token}. The browser must
+  // never see (or be able to reach) the signed URL, and the file is served as an
+  // attachment, so follow the redirect here and stream the PDF back inline from
+  // our own origin. The signed URL is never logged.
+  if (
+    upstream.status === 302 &&
+    req.method === "GET" &&
+    /^runs\/[^/]+\/pdf$/.test(path.join("/"))
+  ) {
+    const location = upstream.headers.get("location") ?? "";
+    const target = new URL(location, API_URL);
+    if (target.pathname.startsWith("/files/")) {
+      const file = await fetch(new URL(target.pathname, API_URL), {
+        cache: "no-store",
+        redirect: "manual",
+      });
+      const h = new Headers();
+      h.set(
+        "content-type",
+        file.headers.get("content-type") ?? "application/pdf",
+      );
+      h.set("cache-control", "private, no-store");
+      if (file.ok) h.set("content-disposition", "inline");
+      return new NextResponse(file.body, { status: file.status, headers: h });
+    }
+  }
+
   // Strip hop-by-hop / encoding headers; the body is passed through as-is.
   const resHeaders = new Headers(upstream.headers);
   resHeaders.delete("content-encoding");
